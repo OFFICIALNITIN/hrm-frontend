@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@next/swc-wasm-nodejs": "^15.4.5",
+    "@next/swc-wasm-web": "^15.4.5",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
