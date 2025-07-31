@@ -22,7 +22,8 @@ import type {
  *    Next.js Route Handlers defined in /app/api (e.g. '/api/employees').
  */
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://hrm-backend-kznh.onrender.com/api/v1";
 
 /**
  * Helper that guarantees we never end up with double slashes when concatenating.
@@ -37,7 +38,7 @@ function buildUrl(endpoint: string) {
 class ApiService {
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {},
+    options: RequestInit = {}
   ): Promise<T> {
     const url = buildUrl(endpoint);
 
@@ -65,7 +66,7 @@ class ApiService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.log(
-          errorData.message || `HTTP error! status: ${response.status}`,
+          errorData.message || `HTTP error! status: ${response.status}`
         );
       }
 
@@ -210,7 +211,7 @@ class ApiService {
 
   async getAllRequests(status: LeaveRequestStatus = "all") {
     return this.request<ApiResponse<LeaveRequest[]>>(
-      `leave/all/requests?status=${status}`,
+      `leave/all/requests?status=${status}`
     );
   }
 
@@ -246,7 +247,7 @@ class ApiService {
       {
         method: "PATCH",
         body: JSON.stringify({ status }),
-      },
+      }
     );
   }
 
@@ -259,7 +260,7 @@ class ApiService {
     });
 
     return this.request<PaginatedResponse<AttendanceRecord>>(
-      `/attendance?${params}`,
+      `/attendance?${params}`
     );
   }
 
@@ -273,6 +274,10 @@ class ApiService {
   // Dashboard API methods (if you have these endpoints)
   async getDashboardStats() {
     return this.request<ApiResponse<DashboardStats>>("/dashboard/stats");
+  }
+
+  async checkIn() {
+    return this.request<ApiResponse<AttendanceRecord>>;
   }
 }
 

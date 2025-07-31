@@ -81,8 +81,19 @@ function calculateDays(startDate: string, endDate: string) {
   return diffDays > 0 ? diffDays : 0;
 }
 
-export function LeavesPage() {
-  const { user } = useAuth();
+export default function LeavesPage() {
+  // Add a try-catch to handle SSR case where useAuth is not available
+  let user = null;
+  let authLoading = false;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    authLoading = auth.loading;
+  } catch (error) {
+    // During SSR, useAuth will throw an error
+    // We'll handle this gracefully
+    authLoading = true;
+  }
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,8 +126,17 @@ export function LeavesPage() {
     currentPage,
     10,
     user?.role === "user" ? user?.id : undefined,
-    statusFilter && statusFilter !== "all" ? statusFilter : undefined,
+    statusFilter && statusFilter !== "all" ? statusFilter : undefined
   );
+
+  // Show loading state during SSR or when auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   console.log(leaveRequests);
   // Fetch leave requests on mount and when currentPage changes
@@ -158,7 +178,7 @@ export function LeavesPage() {
 
   const handleStatusUpdate = async (
     id: string,
-    status: "Approved" | "Rejected",
+    status: "Approved" | "Rejected"
   ) => {
     const success = await updateLeaveRequestStatus(id, status);
     if (success) {
@@ -220,7 +240,7 @@ export function LeavesPage() {
     rejected: leaveRequests.filter((r) => r.status === "rejected").length,
     totalDays: leaveRequests.reduce(
       (sum, r) => sum + calculateDays(r.startDate, r.endDate),
-      0,
+      0
     ),
   };
 
@@ -638,7 +658,7 @@ export function LeavesPage() {
                       <TableCell>
                         <Badge
                           className={`${getStatusColor(
-                            request.status,
+                            request.status
                           )} flex items-center gap-1 w-fit`}
                         >
                           {getStatusIcon(request.status)}

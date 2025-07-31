@@ -39,8 +39,7 @@ import {
   Coffee,
 } from "lucide-react";
 
-export function AttendancePage() {
-  const { user } = useAuth();
+export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -48,7 +47,20 @@ export function AttendancePage() {
   const [checkInTime, setCheckInTime] = useState("");
   const [checkOutTime, setCheckOutTime] = useState("");
 
-  const employeeId = user?.role === "user" ? user.employeeId : undefined;
+  // Add a try-catch to handle SSR case where useAuth is not available
+  let user = null;
+  let authLoading = false;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    authLoading = auth.loading;
+  } catch (error) {
+    // During SSR, useAuth will throw an error
+    // We'll handle this gracefully
+    authLoading = true;
+  }
+
+  const employeeId = user?.role === "user" ? user.employee?.id : undefined;
   const {
     attendance,
     total,
@@ -59,14 +71,23 @@ export function AttendancePage() {
     markAttendance,
   } = useAttendance(selectedDate, currentPage, 10, employeeId);
 
+  // Show loading state during SSR or when auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   const handleMarkAttendance = async (type: "checkin" | "checkout") => {
-    if (!user?.employeeId) return;
+    if (!user?.employee?.id) return;
 
     const time = type === "checkin" ? checkInTime : checkOutTime;
     if (!time) return;
 
     const success = await markAttendance(
-      user.employeeId,
+      user.employee.id,
       type === "checkin" ? time : "",
       type === "checkout" ? time : undefined
     );

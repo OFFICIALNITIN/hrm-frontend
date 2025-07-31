@@ -47,12 +47,23 @@ import {
   Clock,
 } from "lucide-react";
 
-export function PayrollPage() {
-  const { user } = useAuth();
+export default function PayrollPage() {
+  // Add a try-catch to handle SSR case where useAuth is not available
+  let user = null;
+  let authLoading = false;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    authLoading = auth.loading;
+  } catch (error) {
+    // During SSR, useAuth will throw an error
+    // We'll handle this gracefully
+    authLoading = true;
+  }
   const [selectedMonth, setSelectedMonth] = useState("January");
   const [selectedYear, setSelectedYear] = useState(2024);
 
-  const employeeId = user?.role === "user" ? user.employeeId : undefined;
+  const employeeId = user?.role === "user" ? user.employee?.id : undefined;
   const {
     payrollRecords,
     payrollSummary,
@@ -62,6 +73,15 @@ export function PayrollPage() {
     processPayroll,
     generatePayslip,
   } = usePayroll(selectedMonth, selectedYear, employeeId);
+
+  // Show loading state during SSR or when auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   const handleProcessPayroll = async (recordId: string) => {
     const success = await processPayroll(recordId);

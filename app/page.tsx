@@ -10,22 +10,41 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { AddEmployeeDialog } from "@/components/employees/add-employee-dialog";
-import { DashboardPage } from "@/pages/dashboard-page";
-import { EmployeesPage } from "@/pages/employees-page";
-import { DepartmentsPage } from "@/pages/departments-page";
-import { ProfilePage } from "@/pages/profile-page";
-import { UsersPage } from "@/pages/users-page";
-import { AttendancePage } from "@/pages/attendance-page";
-import { LeavesPage } from "@/pages/leaves-page";
-import { PayrollPage } from "@/pages/payroll-page";
-import { ReportsPage } from "@/pages/reports-page";
-import { SettingsPage } from "@/pages/settings-page";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { useEmployees } from "@/hooks/useEmployees";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { useAuth } from "@/contexts/auth-context";
 import { canAccessPage } from "@/utils/permissions";
+import dynamic from "next/dynamic";
+
+// Dynamic imports to prevent SSR issues
+const DashboardPage = dynamic(() => import("@/pages/dashboard-page"), {
+  ssr: false,
+});
+const EmployeesPage = dynamic(() => import("@/pages/employees-page"), {
+  ssr: false,
+});
+const DepartmentsPage = dynamic(() => import("@/pages/departments-page"), {
+  ssr: false,
+});
+const ProfilePage = dynamic(() => import("@/pages/profile-page"), {
+  ssr: false,
+});
+const UsersPage = dynamic(() => import("@/pages/users-page"), { ssr: false });
+const AttendancePage = dynamic(() => import("@/pages/attendance-page"), {
+  ssr: false,
+});
+const LeavesPage = dynamic(() => import("@/pages/leaves-page"), { ssr: false });
+const PayrollPage = dynamic(() => import("@/pages/payroll-page"), {
+  ssr: false,
+});
+const ReportsPage = dynamic(() => import("@/pages/reports-page"), {
+  ssr: false,
+});
+const SettingsPage = dynamic(() => import("@/pages/settings-page"), {
+  ssr: false,
+});
 
 function MainApp() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -74,7 +93,7 @@ function MainApp() {
 
     switch (currentPage) {
       case "dashboard":
-        return <DashboardPage setCurrentPage={setCurrentPage} />;
+        return <DashboardPage />;
       case "profile":
         return <ProfilePage />;
       case "employees":
@@ -114,7 +133,7 @@ function MainApp() {
           </RoleGuard>
         );
       default:
-        return <DashboardPage setCurrentPage={setCurrentPage} />;
+        return <DashboardPage />;
     }
   };
 
@@ -135,7 +154,7 @@ function MainApp() {
                 {getPageTitle()}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Welcome back, {user?.name || "User"}
+                Welcome back, {user?.email || "User"}
               </p>
             </div>
             {showSearchAndAdd && (

@@ -37,8 +37,19 @@ import {
   Settings,
 } from "lucide-react";
 
-export function SettingsPage() {
-  const { user } = useAuth();
+export default function SettingsPage() {
+  // Add a try-catch to handle SSR case where useAuth is not available
+  let user = null;
+  let authLoading = false;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    authLoading = auth.loading;
+  } catch (error) {
+    // During SSR, useAuth will throw an error
+    // We'll handle this gracefully
+    authLoading = true;
+  }
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({
     // Company Settings
@@ -75,6 +86,15 @@ export function SettingsPage() {
     twoFactorAuth: false,
     loginAttempts: "5",
   });
+
+  // Show loading state during SSR or when auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   const handleSave = async (section: string) => {
     setLoading(true);

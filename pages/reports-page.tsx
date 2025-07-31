@@ -128,7 +128,7 @@ const CustomLegend = ({ payload }: any) => {
   );
 };
 
-export function ReportsPage() {
+export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState("employee-growth");
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf" | "excel">(
     "pdf"

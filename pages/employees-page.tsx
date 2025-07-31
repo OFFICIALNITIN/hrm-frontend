@@ -23,7 +23,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 import type { Employee } from "@/types";
 import { useUsers } from "@/hooks/useUsers";
 
-export function EmployeesPage() {
+export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null

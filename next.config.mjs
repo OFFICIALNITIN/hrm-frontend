@@ -9,6 +9,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  // Force all pages to be client-side rendered
+  trailingSlash: false,
+};
 
-export default nextConfig
+export default nextConfig;

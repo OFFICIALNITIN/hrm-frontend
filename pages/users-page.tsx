@@ -31,8 +31,19 @@ import { useUsers } from "@/hooks/useUsers";
 import { useAuth } from "@/contexts/auth-context";
 import type { User } from "@/types";
 
-export function UsersPage() {
-  const { user: currentUser } = useAuth();
+export default function UsersPage() {
+  // Add a try-catch to handle SSR case where useAuth is not available
+  let currentUser = null;
+  let authLoading = false;
+  try {
+    const auth = useAuth();
+    currentUser = auth.user;
+    authLoading = auth.loading;
+  } catch (error) {
+    // During SSR, useAuth will throw an error
+    // We'll handle this gracefully
+    authLoading = true;
+  }
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -51,6 +62,15 @@ export function UsersPage() {
     suspendUser,
     activateUser,
   } = useUsers(currentPage, 10, searchTerm);
+
+  // Show loading state during SSR or when auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   console.log(users);
 
