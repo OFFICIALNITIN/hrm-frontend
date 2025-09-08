@@ -1,3 +1,4 @@
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import type {
   PaginatedResponse,
   ApiResponse,
@@ -22,57 +23,78 @@ import type {
  *    Next.js Route Handlers defined in /app/api (e.g. '/api/employees').
  */
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://hrm-backend-kznh.onrender.com/api/v1";
-
-/**
- * Helper that guarantees we never end up with double slashes when concatenating.
- * Ensures fetch('/')-style paths still work when a base URL is present.
- */
-function buildUrl(endpoint: string) {
-  if (!API_BASE_URL)
-    return endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  return `${API_BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
-}
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1";
 
 class ApiService {
+  private axiosInstance: AxiosInstance;
+
+  constructor() {
+    this.axiosInstance = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 10000, // 10 seconds timeout
+      headers: {
+        "Content-Type": "application/json",
+      },
+      withCredentials: true, // equivalent to credentials: 'include'
+    });
+
+    // Request interceptor
+    this.axiosInstance.interceptors.request.use(
+      (config) => {
+        console.log(
+          `Making ${config.method?.toUpperCase()} request to: ${config.url}`
+        );
+        return config;
+      },
+      (error) => {
+        console.error("Request interceptor error:", error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor
+    this.axiosInstance.interceptors.response.use(
+      (response: AxiosResponse) => {
+        console.log(`Response received:`, response.status, response.statusText);
+        return response;
+      },
+      (error) => {
+        console.error("API request failed:", error);
+
+        if (error.response) {
+          // Server responded with error status
+          const { status, data } = error.response;
+
+          if (status === 401) {
+            console.log("Session expired. Please login again.");
+            throw new Error("Session expired. Please login again.");
+          }
+
+          const errorMessage = data?.message || `HTTP error! status: ${status}`;
+          throw new Error(errorMessage);
+        } else if (error.request) {
+          // Request was made but no response received
+          throw new Error("Network error: No response received from server");
+        } else {
+          // Something else happened
+          throw new Error(`Request setup error: ${error.message}`);
+        }
+      }
+    );
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    config: AxiosRequestConfig = {}
   ): Promise<T> {
-    const url = buildUrl(endpoint);
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...((options.headers as Record<string, string>) || {}),
-    };
-
-    const config: RequestInit = {
-      ...options,
-      headers,
-      credentials: "include",
-    };
-
     try {
-      const response = await fetch(url, config);
-
-      // Handle unauthorized responses
-      if (response.status === 401) {
-        // Redirect to login or trigger logout
-        // window.location.href = "/";
-        console.log("Session expired. Please login again.");
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.log(
-          errorData.message || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      return await response.json();
+      const response = await this.axiosInstance.request<T>({
+        url: endpoint,
+        ...config,
+      });
+      return response.data;
     } catch (error) {
-      console.error("API request failed:", error);
+      // Error is already handled by the response interceptor
       throw error;
     }
   }
@@ -95,14 +117,14 @@ class ApiService {
   async createUser(data: CreateUserDto) {
     return this.request<ApiResponse<User>>("/users", {
       method: "POST",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
   async updateUser(id: string, data: UpdateUserDto) {
     return this.request<ApiResponse<User>>(`/users/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
@@ -124,9 +146,16 @@ class ApiService {
     });
   }
 
-  // Employee API methods - matching your NestJS routes
-  async getEmployees() {
-    return this.request<PaginatedResponse<Employee>>(`/employees`);
+  async getEmployees(search?: string) {
+    const params = new URLSearchParams();
+    if (search) {
+      params.append("searchTerm", search);
+    }
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/employees?${queryString}` : "/employees";
+
+    return this.request<PaginatedResponse<Employee>>(endpoint);
   }
 
   async getEmployee(id: string) {
@@ -136,14 +165,14 @@ class ApiService {
   async createEmployee(data: CreateEmployeeDto) {
     return this.request<ApiResponse<Employee>>("/employees", {
       method: "POST",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
   async updateEmployee(id: string, data: UpdateEmployeeDto) {
     return this.request<ApiResponse<Employee>>(`/employees/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
@@ -165,14 +194,14 @@ class ApiService {
   async createDepartment(data: any) {
     return this.request<ApiResponse<any>>("/departments", {
       method: "POST",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
   async updateDepartment(id: string, data: any) {
     return this.request<ApiResponse<any>>(`/departments/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
@@ -188,7 +217,7 @@ class ApiService {
       ApiResponse<{ email: string; userId: string; role: string }>
     >("/auth/login", {
       method: "POST",
-      body: JSON.stringify(credentials),
+      data: credentials,
     });
   }
 
@@ -224,7 +253,7 @@ class ApiService {
   async rejectLeaveRequest(id: string, reason?: string) {
     return this.request<ApiResponse<LeaveRequest>>(`leave/${id}/reject`, {
       method: "PATCH",
-      body: JSON.stringify(reason),
+      data: { reason },
     });
   }
 
@@ -237,7 +266,7 @@ class ApiService {
   async createLeaveRequest(data: CreateLeaveRequestDto) {
     return this.request<ApiResponse<LeaveRequest>>("/leave", {
       method: "POST",
-      body: JSON.stringify(data),
+      data,
     });
   }
 
@@ -246,7 +275,7 @@ class ApiService {
       `/leave-requests/${id}/status`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        data: { status },
       }
     );
   }
@@ -267,7 +296,7 @@ class ApiService {
   async markAttendance(employeeId: string, checkIn: string) {
     return this.request<ApiResponse<AttendanceRecord>>("/attendance", {
       method: "POST",
-      body: JSON.stringify({ employeeId, checkIn }),
+      data: { employeeId, checkIn },
     });
   }
 
@@ -277,7 +306,9 @@ class ApiService {
   }
 
   async checkIn() {
-    return this.request<ApiResponse<AttendanceRecord>>;
+    return this.request<ApiResponse<AttendanceRecord>>("/attendance/checkin", {
+      method: "POST",
+    });
   }
 }
 

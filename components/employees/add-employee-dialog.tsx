@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
 import type React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +24,72 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { UserPlus } from "lucide-react";
 import type { CreateEmployeeDto } from "@/types";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useUsers } from "@/hooks/useUsers";
+
+// Zod validation schema
+const createEmployeeSchema = z.object({
+  firstName: z
+    .string()
+    .min(1, "First name is required")
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name must not exceed 50 characters"),
+  lastName: z
+    .string()
+    .min(1, "Last name is required")
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name must not exceed 50 characters"),
+  userId: z.string().min(1, "User is required"),
+  departmentId: z
+    .number({
+      required_error: "Department is required",
+      invalid_type_error: "Please select a valid department",
+    })
+    .int("Department must be a valid number")
+    .positive("Please select a valid department"),
+  jobTitle: z
+    .string()
+    .min(1, "Job title is required")
+    .min(2, "Job title must be at least 2 characters")
+    .max(100, "Job title must not exceed 100 characters"),
+  salary: z
+    .number({
+      required_error: "Salary is required",
+      invalid_type_error: "Salary must be a valid number",
+    })
+    .positive("Salary must be greater than 0")
+    .max(10000000, "Salary seems unreasonably high"),
+  hireDate: z
+    .string()
+    .min(1, "Hire date is required")
+    .refine((date) => {
+      const selectedDate = new Date(date);
+      const today = new Date();
+      const oneYearFromNow = new Date();
+      oneYearFromNow.setFullYear(today.getFullYear() + 1);
+
+      return selectedDate <= oneYearFromNow;
+    }, "Hire date cannot be more than 1 year in the future")
+    .refine((date) => {
+      const selectedDate = new Date(date);
+      const minimumDate = new Date("1900-01-01");
+
+      return selectedDate >= minimumDate;
+    }, "Please enter a valid hire date"),
+});
+
+type CreateEmployeeFormData = z.infer<typeof createEmployeeSchema>;
 
 interface AddEmployeeDialogProps {
   onAddEmployee: (employee: CreateEmployeeDto) => Promise<boolean>;
@@ -39,39 +103,46 @@ export function AddEmployeeDialog({
   const { departments, loading: departmentsLoading } = useDepartments();
   const { users, loading: usersLoading } = useUsers();
   const [open, setOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState<CreateEmployeeDto>({
-    firstName: "",
-    lastName: "",
-    departmentId: undefined,
-    jobTitle: "",
-    salary: undefined,
-    hireDate: "",
-    userId: "",
+
+  const form = useForm<CreateEmployeeFormData>({
+    resolver: zodResolver(createEmployeeSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      userId: "",
+      departmentId: undefined,
+      jobTitle: "",
+      salary: undefined,
+      hireDate: "",
+    },
   });
 
-  console.log(formData);
+  const {
+    handleSubmit,
+    formState: { isSubmitting },
+    reset,
+    watch,
+  } = form;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
+  // Watch form values for debugging
+  const formValues = watch();
+  console.log("Form values:", formValues);
 
-    const success = await onAddEmployee(formData);
+  const onSubmit = async (data: CreateEmployeeFormData) => {
+    try {
+      const employeeData: CreateEmployeeDto = {
+        ...data,
+      };
 
-    if (success) {
-      setFormData({
-        firstName: "",
-        lastName: "",
-        departmentId: undefined,
-        jobTitle: "",
-        salary: undefined,
-        hireDate: "",
-        userId: "",
-      });
-      setOpen(false);
+      const success = await onAddEmployee(employeeData);
+
+      if (success) {
+        reset();
+        setOpen(false);
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
     }
-
-    setSubmitting(false);
   };
 
   return (
@@ -91,72 +162,80 @@ export function AddEmployeeDialog({
             Fill in the employee details below to add them to the system.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="firstName" className="text-sm font-medium">
-                  First Name
-                </Label>
-                <Input
-                  id="firstName"
-                  value={formData.firstName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, firstName: e.target.value })
-                  }
-                  placeholder="Enter first name"
-                  className="h-9"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="lastName" className="text-sm font-medium">
-                  Last Name
-                </Label>
-                <Input
-                  id="lastName"
-                  value={formData.lastName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, lastName: e.target.value })
-                  }
-                  placeholder="Enter Last name"
-                  className="h-9"
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="users" className="text-sm font-medium">
-                Users
-              </Label>
-              <Select
-                value={formData.userId}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    userId: value,
-                  })
-                }
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select users" />
-                </SelectTrigger>
-                <SelectContent>
-                  {usersLoading ? (
-                    <SelectItem value="" disabled>
-                      Loading users...
-                    </SelectItem>
-                  ) : (
-                    users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.email}
-                      </SelectItem>
-                    ))
+        <Form {...form}>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        First Name
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter first name"
+                          className="h-9"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </SelectContent>
-              </Select>
-            </div>
-            {/* <div className="grid gap-2">
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Last Name
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter last name"
+                          className="h-9"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="userId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">User</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select user" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {usersLoading ? (
+                          <SelectItem value="" disabled>
+                            Loading users...
+                          </SelectItem>
+                        ) : (
+                          users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.email}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/* <div className="grid gap-2">
               <Label htmlFor="email" className="text-sm font-medium">
                 Email
               </Label>
@@ -172,59 +251,66 @@ export function AddEmployeeDialog({
                 required
               />
             </div> */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="department" className="text-sm font-medium">
-                  Department
-                </Label>
-                <Select
-                  value={
-                    formData.departmentId !== undefined
-                      ? String(formData.departmentId)
-                      : ""
-                  }
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      departmentId: value ? Number(value) : undefined,
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departmentsLoading ? (
-                      <SelectItem value="" disabled>
-                        Loading departments...
-                      </SelectItem>
-                    ) : (
-                      departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id.toString()}>
-                          {dept.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="jobTitle" className="text-sm font-medium">
-                  Job Title
-                </Label>
-                <Input
-                  id="jobTitle"
-                  value={formData.jobTitle}
-                  onChange={(e) =>
-                    setFormData({ ...formData, jobTitle: e.target.value })
-                  }
-                  placeholder="Enter position"
-                  className="h-9"
-                  required
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="departmentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Department
+                      </FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        value={field.value ? String(field.value) : ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departmentsLoading ? (
+                            <SelectItem value="" disabled>
+                              Loading departments...
+                            </SelectItem>
+                          ) : (
+                            departments.map((dept) => (
+                              <SelectItem
+                                key={dept.id}
+                                value={dept.id.toString()}
+                              >
+                                {dept.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="jobTitle"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Job Title
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter position"
+                          className="h-9"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-            </div>
-            {/* <div className="grid gap-2">
+              {/* <div className="grid gap-2">
               <Label htmlFor="phone" className="text-sm font-medium">
                 Phone
               </Label>
@@ -238,7 +324,7 @@ export function AddEmployeeDialog({
                 className="h-9"
               />
             </div> */}
-            {/* <div className="grid gap-2">
+              {/* <div className="grid gap-2">
               <Label htmlFor="address" className="text-sm font-medium">
                 Address
               </Label>
@@ -252,69 +338,78 @@ export function AddEmployeeDialog({
                 className="h-9"
               />
             </div> */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="salary" className="text-sm font-medium">
-                  Salary
-                </Label>
-                <Input
-                  id="salary"
-                  type="number"
-                  value={formData.salary || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      salary: e.target.value
-                        ? Number(e.target.value)
-                        : undefined,
-                    })
-                  }
-                  placeholder="Enter salary"
-                  className="h-9"
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="salary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Salary
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter salary"
+                          className="h-9"
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                ? Number(e.target.value)
+                                : undefined
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="hireDate" className="text-sm font-medium">
-                  Hire Date
-                </Label>
-                <Input
-                  id="joinDate"
-                  type="date"
-                  value={formData.hireDate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, hireDate: e.target.value })
-                  }
-                  className="h-9"
-                  required
+                <FormField
+                  control={form.control}
+                  name="hireDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Hire Date
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="date" className="h-9" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Adding...
-                </>
-              ) : (
-                "Add Employee"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Employee"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
